@@ -1,0 +1,22 @@
+# Creating a dataset
+
+Code to shrink the dataset with all of the wanding and environmental data into a more manageable dataset with just the Obear brook observations and relevant explanatory variables.
+
+## Running Code
+
+Load the dataset with all of the wanding and environmental data into R.
+```{r load in data table}
+cdWB <- read.csv("cdWB_All.csv", header=T)
+```
+
+Filter the dataset to include only the Obear brook observations.
+```{r filter to just Obear}
+library(dplyr)
+
+#specify team names to keep
+river_name <- 'wb obear'
+
+#select all rows where team is in list of team names to keep
+obear_All <- cdWB %>% filter(river %in% river_name)
+head(obear_All)
+```

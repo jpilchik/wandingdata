@@ -1,0 +1,162 @@
+# EcoStats Final Project
+Name: Josie Pilchik
+Date: 4/16/2024
+
+Response variable: 
+-distMoved
+
+Explanatory variables:
+-year
+-month
+-section
+-observedLength
+-observedWeight
+-meanTemperature
+-meanFlowByRiver
+-moveDir????
+
+Random effects variables:
+-tag
+
+## Data exploration
+```{r load packages}
+# load packages needed later
+library(MASS)
+library(MuMIn)
+library(AICcmodavg)
+library(lattice)
+library(corrplot)
+library(car)
+library(pscl)
+library(GGally)
+library(DHARMa)
+library(glmmTMB)
+
+head(obear)
+str(obear)
+```
+```{r}
+# histogram of distance moved
+hist(obear$distMoved, breaks=seq(-90,15,1), main="Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+```
+```{r}
+# Turn categorical variables into factors
+obear$isYOY <- as.factor(obear$isYOY)
+obear$year <- as.integer(obear$year)
+obear$month <- as.integer(obear$month)
+obear$tag <- as.factor(obear$tag)
+obear$moveDir <- as.factor(obear$moveDir)
+obear$section <- as.factor(obear$section)
+```
+
+```{r}
+# Remove NA values
+sub <- obear[!is.na(obear$distMoved),]
+sub <- sub[!is.na(sub$observedLength),]
+sub <- sub[!is.na(sub$observedWeight),]
+head(sub)
+summary(sub)
+```
+
+```{r}
+# Create a new subset dataframe with new distMoved column that removes zeros and negative values
+
+#distMovedNew <- abs(sub$distMoved)
+#sub$distMovedNew <- distMovedNew
+#sub <- sub[sub$distMovedNew != 0, ]
+#head(sub)
+```
+
+```{r}
+# Remove the -90 value
+
+#sub <- sub[-which(sub$X==30472), ]
+```
+
+```{r}
+# Separate YOY from not YOY
+YOY <- sub[ which(sub$isYOY=='TRUE'), ]
+adult <- sub[ which(sub$isYOY=='FALSE'), ]
+```
+
+```{r}
+## standardize numeric explanatory variables??
+```
+
+```{r}
+# Evaluate the mean-to-variance relationship to check for potential overdispersion
+(mean <- mean(YOY$distMoved))
+(var <- var(YOY$distMoved))
+
+(mean <- mean(adult$distMoved))
+(var <- var(adult$distMoved))
+```
+```{r}
+# histogram of distance moved
+hist(YOY$distMoved,breaks=seq(-45,15,1), main="YOY Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(YOY$distMoved, cex.axis=0.8,
+ylab="YOY Distance Moved", main="")
+```
+```{r}
+# histogram of distance moved
+hist(adult$distMoved,breaks=seq(-90,15,1), main="Adult Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(adult$distMoved, cex.axis=0.8,
+ylab="Adult Distance Moved", main="")
+```
+```{r}
+# Create a distance moved QQplot
+qqnorm(YOY$distMoved)
+```
+```{r}
+# Create a distance moved QQplot
+qqnorm(adult$distMoved)
+```
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLength", "observedWeight", "meanTemperature", "meanFlowByRiver")
+ggpairs(YOY[,covs])
+```
+
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLength", "observedWeight", "meanTemperature", "meanFlowByRiver")
+ggpairs(adult[,covs])
+```
+```{r}
+vif(glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.omit"))
+```
+```{r}
+vif(glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=adult, family="gaussian", na.action = "na.omit"))
+```
+```{r}
+# AIC the faster way using the 'dredge()' function in the MuMIn package
+yfull <- glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.fail")
+
+dredge(yfull, rank = "AIC")
+```
+```{r}
+ybest <- glm(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.fail")
+```
+
+```{r}
+# AIC the faster way using the 'dredge()' function in the MuMIn package
+afull <- glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=adult, family="gaussian", na.action = "na.fail")
+
+dredge(afull, rank = "AIC")
+```
+```{r}
+abest <- glm(distMoved ~ section + observedLength + observedWeight + meanTemperature, data=adult, family="gaussian", na.action = "na.fail")
+```
+
+
+
