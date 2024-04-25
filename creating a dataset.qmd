@@ -6,7 +6,7 @@ Code to shrink the dataset with all of the wanding and environmental data into a
 
 Load the dataset with all of the wanding and environmental data into R.
 ```{r load in data table}
-cdWB <- read.csv("cdWB_All.csv", header=T)
+cdWB <- read.csv('/Users/jpilchik/OneDrive - DOI/Documents/Wanding_Data/docs/data/cdWB_All.csv', header=T)
 ```
 
 Filter the dataset to include only the Obear brook observations.
@@ -19,4 +19,16 @@ river_name <- 'wb obear'
 #select all rows where team is in list of team names to keep
 obear_All <- cdWB %>% filter(river %in% river_name)
 head(obear_All)
+```
+
+Filter the dataset to include only the relevant explanatory variables.
+```{r}
+obear <- obear_All %>% select(-one_of('survey', 'pass', 'comments', 'proportionSampled', 'lagDetectionDate', 'meanFlow', 'meanFlowByArea_flowExt', 'meanFlowByArea_ByRiver', 'sdFlow', 'sdFlowByRiver', 'sdFlowByArea_flowExt', 'sdFlowByArea_ByRiver', 'propBelowLoFlowThreshByRiver', 'propAboveHiFlowThreshByRiver', 'propBelowLoFlowThreshByArea_flowExt', 'propAboveHiFlowThreshByArea_flowExt', 'sectionN', 'instance', 'quarter', 'habitat', 'cover', 'justification', 'sectionWQuarter', 'j', 'dummy', 'ageInSamples', 'lagSection', 'lagObservedWeight', 'lagObservedLength', 'lagSampleNumber', 'sampleNumberDiff', 'minSample', 'maxSample', 'minYear', 'sampleInterval', 'quarter_length', 'river_meter', 'confluence_river_meter', 'riverMeter', 'nPasses', 'wGR_Slope', 'grWeightS', 'lw_intercept', 'lw_slope', 'cf', 'relCF', 'nPerInd', 'meanTemperatureScaledBySeason', 'meanFlowScaledBySeason', 'meanFlowByRiverScaledBySeason', 'meanFlowByArea_flowExtScaledBySeason', 'meanFlowByArea_ByRiverScaledBySeason', 'meanTemperatureScaledBySeasonRiver', 'meanFlowScaledBySeasonRiver', 'meanFlowByRiverScaledBySeasonRiver', 'meanFlowByArea_flowExtScaledBySeasonRiver', 'meanFlowByArea_ByRiverScaledBySeasonRiver', 'comment', 'sampleType', 'departure', 'readerType', 'riverOrdered', 'sampleName', 'sampleNumber', 'dateEmigrated', 'grWeight', 'grLength', 'drainage', 'inside', 'area', 'leftOrRight', 'readerId', 'species', 'aliveOrDead', 'sectionOriginal', 'cohort', 'sex', 'season', 'yday', 'date')) 
+```
+
+Break the date observations into month and year so that those variables can be used separately as explanatory variables.
+```{r}
+library(tidyverse)
+obear <- separate(obear, detectionDate, into = c('year', 'month', 'day', 'time')) %>% select(-one_of('day','time'))
+head(obear)
 ```
