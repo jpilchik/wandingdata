@@ -1,0 +1,320 @@
+---
+title: "Distance moved model fitting"
+---
+## Data loading
+```{r load packages}
+# load packages needed later
+library(MASS)
+library(MuMIn)
+library(AICcmodavg)
+library(lattice)
+library(corrplot)
+library(car)
+library(pscl)
+library(GGally)
+library(DHARMa)
+library(glmmTMB)
+library(lme4)
+
+head(adult_all)
+head(adult)
+```
+
+## Data exploration
+```{r}
+# histogram of distance moved
+hist(adult_all$distMoved,breaks=seq(-90,45,1), main="Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(adult_all$distMoved, cex.axis=0.8,
+ylab="Distance Moved", main="")
+```
+```{r}
+# Evaluate the mean-to-variance relationship to check for potential overdispersion
+(mean <- mean(adult$distMovedp))
+(var <- var(adult$distMovedp))
+```
+```{r}
+rm(mean, var)
+```
+
+```{r}
+# histogram of distance moved
+hist(adult$distMovedp,breaks=seq(0,45,1), main="Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(adult$distMovedp, cex.axis=0.8,
+ylab="Distance Moved", main="")
+```
+```{r}
+# Create a distance moved QQplot
+qqnorm(adult$distMovedp)
+```
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLengthz", "observedWeightz", "meanTemperaturez", "meanFlowByRiverz", "distMovedp")
+ggpairs(adult[,covs])
+```
+
+
+
+## Distance moved model fitting
+```{r}
+# Remove the zeros
+adultfiltered <- adult %>% filter(distMovedp > 0) 
+head(adultfiltered)
+```
+```{r}
+# Evaluate the mean-to-variance relationship to check for potential overdispersion
+(mean <- mean(adultfiltered$distMovedp))
+(var <- var(adultfiltered$distMovedp))
+```
+```{r}
+# histogram of distance moved
+hist(adultfiltered$distMovedp,breaks=seq(0,45,1), main="Adult Distance moved",xlab="Distance",
+     right=TRUE,freq=FALSE,
+     col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(adultfiltered$distMovedp, cex.axis=0.8, ylab="Adult Distance Moved", main="")
+```
+```{r}
+# Create a distance moved QQplot
+qqnorm(adultfiltered$distMovedp)
+```
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLengthz", "observedWeightz", "meanTemperaturez", "meanFlowByRiverz", "distMovedp")
+ggpairs(adultfiltered[,covs])
+```
+```{r}
+boxplot(adultfiltered$distMovedp ~ adultfiltered$section, cex.axis=0.8, ylab="Distance moved", main="")
+```
+
+
+```{r}
+############## Check this ###############
+library(ggplot2)
+ggplot(adultfiltered, aes(meanTemperaturez, distMovedp)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_hline(yintercept = 0) +
+theme_bw()
+
+library(ggplot2)
+ggplot(adultfiltered, aes(meanFlowByRiver, distMovedp)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_hline(yintercept = 0) +
+theme_bw()
+
+library(ggplot2)
+ggplot(adultfiltered, aes(observedLengthz, distMovedp)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_hline(yintercept = 0) +
+theme_bw()
+############### Check this ##############
+```
+
+```{r}
+vif(glm(distMovedp ~ year + month + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+```
+```{r}
+vif(glm(distMovedp ~ year + month, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+
+vif(glm(distMovedp ~ observedLengthz + observedWeightz, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+
+vif(glm(distMovedp ~ meanTemperaturez + month, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+
+vif(glm(distMovedp ~ meanFlowByRiverz + month, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+```
+```{r}
+fitList <- list(
+"a.month" = glm(distMovedp ~ month + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log")),
+"a.year" = glm(distMovedp ~ year + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log"))
+)
+aictab(fitList)
+```
+```{r}
+fitList <- list(
+"a.month" = glm(distMovedp ~ year + month + section + observedLengthz + observedWeightz + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log")),
+"a.temperature" = glm(distMovedp ~ year + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log"))
+)
+aictab(fitList)
+```
+```{r}
+fitList <- list(
+"a.length" = glm(distMovedp ~ year + month + section + observedLengthz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log")),
+"a.weight" = glm(distMovedp ~ year + month + section + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log"))
+)
+aictab(fitList)
+```
+```{r}
+vif(glm(distMovedp ~ month + section + observedLengthz  + meanFlowByRiverz, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.omit"))
+```
+```{r}
+a.full <- (glm(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz, data=adultfiltered, family=Gamma(link = "log"), na.action = "na.fail"))
+
+dredge(a.full, rank = "AIC")
+```
+
+```{r}
+a.null <- glm(distMovedp ~ 1, data=adultfiltered, family=Gamma(link = "log"))
+a.top <- glm(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz, data=adultfiltered, family=Gamma(link = "log"))
+a.glmm <- glmer(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz 
+                + (1|tagID_factor), data=adultfiltered, family=Gamma(link = "log"))
+a.nglmm <- glmer(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz 
+                 + (1|year/tagID_factor),
+                 data=adultfiltered, family=Gamma(link = "log"), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+anova(a.glmm, a.nglmm, a.top, a.null)
+```
+```{r}
+a.null <- glm(distMovedp ~ 1, data=adultfiltered, family=Gamma(link = "log"))
+a.top <- glm(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz, data=adultfiltered, family=Gamma(link = "log"))
+a.glmm <- glmer(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz + (1|tagID_factor), data=adultfiltered, family=Gamma(link = "log"))
+a.nglmm <- glmer(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz 
+                 + (1|year/tagID_factor),
+                 data=adultfiltered, family=Gamma(link = "log"), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1000000)))
+a.glmm0 <- glmer(distMovedp ~ 1 + (1|tagID_factor), data=adultfiltered, 
+                 family=Gamma(link = "log"), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1000000)))
+a.nglmm0 <- glmer(distMovedp ~ 1 + (1|year/tagID_factor), data=adultfiltered, 
+                  family=Gamma(link = "log"), 
+                  control = glmerControl(optimizer = "bobyqa",optCtrl = list(maxfun = 1000000)))
+
+a.list <- list(
+"m0" = a.null,
+"m1" = a.top,
+"mm0" = a.glmm0,
+"mm1" = a.glmm,
+"nmm0" = a.nglmm0,
+"nmm1" = a.nglmm
+)
+
+aic.table <- data.frame(AIC = sapply(a.list, AIC))
+aic.table$Delta.AIC <- aic.table$AIC - min(aic.table$AIC)
+aic.table <- aic.table[order(aic.table$AIC),]
+aic.table[1:6,]
+```
+```{r}
+#Define the best model based on the above information (that being a.nglmm/nmm1)
+a.best <- glmer(distMovedp ~ month*meanFlowByRiverz + section + observedLengthz 
+                 + (1|year/tagID_factor),
+                 data=adultfiltered, family=Gamma(link = "log"), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1000000)))
+summary(a.best)
+```
+```{r}
+# Simulate residuals with the top glm model
+a.best.simResid <- simulateResiduals(fittedModel = a.best, plot = F)
+plot(a.best.simResid)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# AIC the faster way using the 'dredge()' function in the MuMIn package
+#a.full <- glmer(distMovedp ~ section + observedWeightz + meanTemperaturez*meanFlowByRiverz + (1|year/tag), data=adult, family=gaussian(link=log), na.action = "na.fail")
+
+#dredge(a.full, rank = "AIC")
+```
+
+```{r}
+# AIC the faster way using the 'dredge()' function in the MuMIn package
+#a.full <- glm(distMoved ~ year + month + section + observedLength + meanTemperature + meanFlowByRiver + month:observedLength + month:meanTemperature, data=adult, family="gaussian", na.action = "na.fail")
+
+#dredge(a.full, rank = "AIC")
+```
+
+```{r}
+#a.null <- glm(distMoved ~ 1, data=adult, family="gaussian")
+#a.top <- glm(distMoved ~ section + meanTemperature, data=adult, family="gaussian")
+#a.glmm <- glmer(distMoved ~ section + meanTemperature + (1|tag), data=adult, family="gaussian")
+#anova(a.glmm, a.top, a.null)
+```
+```{r}
+# Simulate residuals with the top glm model
+#a.top.simResid <- simulateResiduals(fittedModel = a.top, plot = F)
+#plot(a.top.simResid)
+```
+
+```{r}
+
+#a.try <- glmer(distMoved ~ section + meanTemperature + meanFlowByRiver + meanTemperature:meanFlowByRiver + (1|year/tag), data=adult, family="gaussian")
+#a.try.simResid <- simulateResiduals(fittedModel = a.try, plot = F)
+#plot(a.try.simResid)
+```
+
+
+```{r}
+#testDispersion(a.top)
+#testZeroInflation(a.top)
+```
+
+```{r}
+# Simulate residuals with the glmm model
+#a.glmm.simResid <- simulateResiduals(fittedModel = a.glmm, plot = F)
+#plot(a.glmm.simResid)
+```
+```{r}
+#testDispersion(a.glmm)
+#testZeroInflation(a.glmm)
+```
+```{r}
+# GLM
+#a.m0 <- glm(distMoved ~ 1, data=adult, family="gaussian")
+#a.m1 <- glm(distMoved ~ section + meanTemperature, data=adult, family="gaussian")
+#a.m2 <- glm(distMoved ~ section + observedWeight + meanTemperature, data=adult, family="gaussian")
+#a.m3 <- glm(distMoved ~ section + meanTemperature + year, data=adult, family="gaussian")
+#a.m4 <- glm(distMoved ~ section + meanTemperature + month, data=adult, family="gaussian")
+
+# GLMM
+#a.mm0 <- glmer(distMoved ~ 1 + (1|tag), data=adult, family="gaussian")
+#a.mm1 <- glmer(distMoved ~ section + meanTemperature + (1|tag), data=adult, family="gaussian")
+#a.mm2 <- glmer(distMoved ~ section + observedWeight + meanTemperature + (1|tag), data=adult, family="gaussian")
+#a.mm3 <- glmer(distMoved ~ section + meanTemperature + year + (1|tag), data=adult, family="gaussian")
+#a.mm4 <- glmer(distMoved ~ section + meanTemperature + month + (1|tag), data=adult, family="gaussian")
+
+# ZIP
+#y.zi <- zlm(distMoved ~ 1, data=YOY, method = "glm", silent = TRUE, ...)
+#library(pscl)
+#y.zip0 <- zeroinfl(Crabs ~ AirTemp | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip1 <- zeroinfl(Crabs ~ AirTemp | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip2 <- zeroinfl(Crabs ~ AirTemp + AirTemp2 | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip3 <- glmmTMB(Crabs ~ AirTemp + (1|Site), data = crabs, ziformula = ~ AirTemp, family = "poisson")
+#y.zip4 <- glmmTMB(Crabs ~ AirTemp + AirTemp2 + (1|Site), data = crabs, ziformula = ~ AirTemp, family = "poisson")
+
+#a.list <- list("m0" = a.m0,"m1" = a.m1,"m2" = a.m2,"m3" = a.m3,"m4" = a.m4,"mm0" = a.mm0, "mm1" = a.mm1,"mm2" = a.mm2,"mm3" = a.mm3,"mm4" = a.mm4)
+
+#aic.table <- data.frame(AIC = sapply(a.list, AIC))
+#aic.table$Delta.AIC <- aic.table$AIC - min(aic.table$AIC)
+#aic.table <- aic.table[order(aic.table$AIC),]
+#aic.table[1:10,]
+```
+```{r}
+#Define the best model based on the above information (that being a.top/a.m1)
+#a.best <- glm(distMoved ~ section + meanTemperature, data=adult, family="gaussian", na.action = "na.fail")
+```

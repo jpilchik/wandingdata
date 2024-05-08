@@ -1,0 +1,121 @@
+---
+title: "YOY code (not for final project)"
+format: html
+---
+
+## YOY data exploration
+```{r}
+# Separate YOY from adults
+YOY <- sub[ which(sub$isYOY=='TRUE'), ]
+```
+
+```{r}
+# Evaluate the mean-to-variance relationship to check for potential overdispersion
+(mean <- mean(YOY$distMoved))
+(var <- var(YOY$distMoved))
+```
+
+```{r}
+# histogram of distance moved
+hist(YOY$distMoved,breaks=seq(-45,15,1), main="YOY Distance moved",xlab="Distance", right=TRUE,freq=FALSE, col=adjustcolor("darkred",0.5))
+
+# boxplot of distance moved
+boxplot(YOY$distMoved, cex.axis=0.8, ylab="YOY Distance Moved", main="")
+```
+
+```{r}
+# Create a distance moved QQplot
+qqnorm(YOY$distMoved)
+```
+
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLength", "observedWeight", "meanTemperature", "meanFlowByRiver")
+ggpairs(YOY[,covs])
+```
+
+## YOY model fitting
+```{r}
+vif(glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.omit"))
+```
+
+```{r}
+# AIC the faster way using the 'dredge()' function in the MuMIn package
+yfull <- glm(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.fail")
+
+dredge(yfull, rank = "AIC")
+```
+
+```{r}
+y.null <- glm(distMoved ~ 1, data=YOY, family="gaussian")
+y.top <- glm(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian")
+y.glmm <- glmer(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver + (1|tag), data=YOY, family="gaussian")
+anova(y.glmm, y.top, y.null)
+```
+
+```{r}
+# Simulate residuals with the top glm model
+y.top.simResid <- simulateResiduals(fittedModel = y.top, plot = F)
+plot(y.top.simResid)
+```
+
+```{r}
+testDispersion(y.top)
+testZeroInflation(y.top)
+```
+
+```{r}
+# Simulate residuals with the glmm model
+y.glmm.simResid <- simulateResiduals(fittedModel = y.glmm, plot = F)
+plot(y.glmm.simResid)
+```
+
+```{r}
+testDispersion(y.glmm)
+testZeroInflation(y.glmm)
+```
+
+```{r}
+#y.zip0 <- zeroinfl(Crabs ~ AirTemp | AirTemp, data = crabs, dist = "poisson", link = "logit")
+
+#require(MuMIn)
+#y.zi <- zeroinfl(distMoved ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver, ziformula = ~ year + month + section + observedLength + observedWeight + meanTemperature + meanFlowByRiver + tag, data=YOY, dist = "gaussian", link = "identity", na.action = 'na.fail')
+#dredge(y.zi, rank='AIC')
+```
+
+```{r}
+# GLM
+y.m0 <- glm(distMoved ~ 1, data=YOY, family="gaussian")
+y.m1 <- glm(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian")
+y.m2 <- glm(distMoved ~ year + section + observedLength + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian")
+y.m3 <- glm(distMoved ~ year + section + observedWeight + month + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian")
+y.m4 <- glm(distMoved ~ year + section + observedLength + month + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian")
+
+# GLMM
+y.mm0 <- glmer(distMoved ~ 1 + (1|tag), data=YOY, family="gaussian")
+y.mm1 <- glmer(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver + (1|tag), data=YOY, family="gaussian")
+y.mm2 <- glmer(distMoved ~ year + section + observedLength + meanTemperature + meanFlowByRiver + (1|tag), data=YOY, family="gaussian")
+y.mm3 <- glmer(distMoved ~ year + section + observedWeight + month + meanTemperature + meanFlowByRiver + (1|tag), data=YOY, family="gaussian")
+y.mm4 <- glmer(distMoved ~ year + section + observedLength + month + meanTemperature + meanFlowByRiver + (1|tag), data=YOY, family="gaussian")
+
+# ZIP
+#y.zi <- zlm(distMoved ~ 1, data=YOY, method = "glm", silent = TRUE, ...)
+#library(pscl)
+#y.zip0 <- zeroinfl(Crabs ~ AirTemp | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip1 <- zeroinfl(Crabs ~ AirTemp | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip2 <- zeroinfl(Crabs ~ AirTemp + AirTemp2 | AirTemp, data = crabs, dist = "poisson", link = "logit")
+#y.zip3 <- glmmTMB(Crabs ~ AirTemp + (1|Site), data = crabs, ziformula = ~ AirTemp, family = "poisson")
+#y.zip4 <- glmmTMB(Crabs ~ AirTemp + AirTemp2 + (1|Site), data = crabs, ziformula = ~ AirTemp, family = "poisson")
+
+y.list <- list("m0" = y.m0, "m1" = y.m1, "m2" = y.m2, "m3" = y.m3, "m4" = y.m4, "mm0" = y.mm0, "mm1" = y.mm1, "mm2" = y.mm2, "mm3" = y.mm3, "mm4" = y.mm4)
+
+aic.table <- data.frame(AIC = sapply(y.list, AIC))
+aic.table$Delta.AIC <- aic.table$AIC - min(aic.table$AIC)
+aic.table <- aic.table[order(aic.table$AIC),]
+aic.table[1:10,]
+```
+
+```{r}
+#Define the best model based on the above information (that being y.top/y.m1)
+y.best <- glm(distMoved ~ year + section + observedWeight + meanTemperature + meanFlowByRiver, data=YOY, family="gaussian", na.action = "na.fail")
+```

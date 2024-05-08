@@ -1,0 +1,259 @@
+# EcoStats Final Project
+Name: Josie Pilchik
+Date: 4/16/2024
+
+Response variable: 
+-distMoved
+
+Potential explanatory variables (to be explored through data exploration):
+-year
+-month
+-section (the section the fish is found in at each of the sampling events)
+-observedLength
+-observedWeight
+-meanTemperature
+-meanFlowByRiver
+
+Random effects variables:
+-tag
+
+## Data loading
+```{r load packages}
+# load packages needed later
+library(MASS)
+library(MuMIn)
+library(AICcmodavg)
+library(lattice)
+library(corrplot)
+library(car)
+library(pscl)
+library(GGally)
+library(DHARMa)
+library(glmmTMB)
+library(lme4)
+library(tidyverse)
+
+head(adult_all)
+head(adult)
+```
+
+## Data exploration
+```{r}
+adult$non_zero <- ifelse(adult$distMovedp > 0, 1, 0)
+```
+
+```{r}
+length(adult$non_zero[which(adult$non_zero==0)]) # number of 0's
+length(adult$non_zero[which(adult$non_zero==1)]) # number of 1's
+mean(adult$non_zero) # proportion of ones (~p)
+par(mfrow=c(1,1))
+hist(adult$non_zero, breaks=seq(0,1,0.1), col="lightblue")
+```
+```{r}
+# pairs plot to visualize all data
+covs <- c("year", "month", "section", "observedLengthz", "observedWeightz", "meanTemperaturez", "meanFlowByRiverz")
+ggpairs(adult[,covs])
+```
+```{r}
+rm(covs)
+```
+
+```{r}
+############## Check this ###############
+library(ggplot2)
+ggplot(adult, aes(meanTemperaturez, non_zero)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_hline(yintercept = 0) +
+theme_bw()
+
+library(ggplot2)
+ggplot(adult, aes(meanFlowByRiver, non_zero)) +
+geom_point() +
+geom_smooth(method = "loess") +
+geom_hline(yintercept = 0) +
+theme_bw()
+############### Check this ##############
+```
+
+## Movers vs Stayers model fitting
+```{r}
+vif(glm(non_zero ~ year + month + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adult, family=binomial(link=logit), na.action = "na.omit"))
+```
+```{r}
+vif(glm(non_zero ~ meanTemperaturez + month, data=adult, family=binomial(link=logit), na.action = "na.omit"))
+
+vif(glm(non_zero ~ observedLengthz + observedWeightz, data=adult, family=binomial(link=logit), na.action = "na.omit"))
+```
+```{r}
+fitList <- list(
+"a.month" = glm(non_zero ~ year + month + section + observedLengthz + observedWeightz + meanFlowByRiverz, data=adult, family=binomial(link=logit)),
+"a.temperature" = glm(non_zero ~ year + section + observedLengthz + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adult, family=binomial(link=logit))
+)
+aictab(fitList)
+```
+```{r}
+fitList <- list(
+"a.length" = glm(non_zero ~ year + month + section + observedLengthz + meanTemperaturez + meanFlowByRiverz, data=adult, family=binomial(link=logit)),
+"a.weight" = glm(non_zero ~ year + month + section + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adult, family=binomial(link=logit))
+)
+aictab(fitList)
+```
+```{r}
+vif(glm(non_zero ~ year + section + observedWeightz + meanTemperaturez + meanFlowByRiverz, data=adult, family=binomial(link=logit), na.action = "na.omit"))
+```
+```{r}
+rm(fitList)
+```
+
+```{r}
+#Remove year due to collinearity - test it with tag later as a nested random effect
+b.full <- glm(non_zero ~ section + observedWeightz + meanTemperaturez*meanFlowByRiverz, 
+             family = binomial(link = logit),
+             data = adult, na.action = "na.fail")
+
+dredge(b.full, rank = "AIC")
+```
+```{r}
+b.null <- glm(non_zero ~ 1, data=adult, family = binomial(link = logit))
+b.top <- glm(non_zero ~ section + observedWeightz + meanTemperaturez, data=adult, family = binomial(link = logit))
+b.glmm <- glmer(non_zero ~ section + observedWeightz + meanTemperaturez + (1|tagID_factor), data=adult, family = binomial(link = logit), control = glmerControl(optimizer = "bobyqa", 
+                                       optCtrl = list(maxfun = 100000)))
+anova(b.glmm, b.top, b.null)
+```
+```{r}
+b.null <- glm(non_zero ~ 1, data=adult, family = binomial(link = logit))
+b.top <- glm(non_zero ~ section + observedWeightz + meanTemperaturez, data=adult, 
+             family = binomial(link = logit))
+b.glmm <- glmer(non_zero ~ section + observedWeightz + meanTemperaturez + (1|tagID_factor), 
+                data=adult, family = binomial(link = logit), 
+                control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+b.glmm0 <- glmer(non_zero ~ 1 + (1|tagID_factor), data=adult, family = binomial(link = logit), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+b.nglmm0 <- glmer(non_zero ~ 1 + (1|year/tagID_factor), data=adult, 
+                  family = binomial(link = logit),
+                  control = glmerControl(optimizer = "bobyqa", 
+                                         optCtrl = list(maxfun = 100000)))
+b.nglmm <- glmer(non_zero ~ section + observedWeightz + meanTemperaturez +
+                   (1|year/tagID_factor),
+                 data=adult, family = binomial(link = logit), 
+                 control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)))
+
+b.list <- list(
+"m0" = b.null,
+"m1" = b.top,
+"mm0" = b.glmm0,
+"mm1" = b.glmm,
+"nmm0" = b.nglmm0,
+"nmm1" = b.nglmm
+)
+
+aic.table <- data.frame(AIC = sapply(b.list, AIC))
+aic.table$Delta.AIC <- aic.table$AIC - min(aic.table$AIC)
+aic.table <- aic.table[order(aic.table$AIC),]
+aic.table[1:6,]
+```
+```{r}
+rm(b.full, b.null, b.top, b.glmm0, b.glmm, b.nglmm0, b.nglmm, aic.table, b.list)
+```
+
+```{r}
+#Define the best model based on the above information (that being b.glmm/mm1)
+b.best <- glmer(non_zero ~ section + observedWeightz + meanTemperaturez + (1|tagID_factor), data=adult, family = binomial(link = logit), control = glmerControl(optimizer = "bobyqa", 
+                                       optCtrl = list(maxfun = 100000)))
+summary(b.best)
+```
+```{r}
+# Simulate residuals with the top glm model
+b.best.simResid <- simulateResiduals(fittedModel = b.best, plot = F)
+plot(b.best.simResid)
+```
+```{r}
+rm(b.best.simResid)
+```
+
+```{r}
+# Extract unique levels of 'tag' from the original data
+tag_levels <- levels(adult$tagID_factor)
+
+# Create df.predict with 'tag' included using the existing levels
+df.predict <- expand.grid(
+  meanTemperaturez = seq(min(adult$meanTemperaturez), max(adult$meanTemperaturez), length=100),
+  observedWeightz = mean(adult$observedWeightz),
+  section = unique(adult$section),
+  tagID_factor = tag_levels  # Include 'tag' using existing levels
+)
+
+# 1. Generate predictions on the response scale
+predictions <- predict(b.best, newdata = df.predict, type = "response")
+
+# 2. Create a dataframe with predictions and relevant predictor variables
+df.pred <- cbind(df.predict, predictions)
+
+# Calculate confidence intervals 
+# df.pred$ci.lo <- df.pred$fit - 1.96 * df.pred$se.fit
+# df.pred$ci.hi <- df.pred$fit + 1.96 * df.pred$se.fit
+
+# unscale our explanatory variables
+df.pred$meanTemperature <- (df.pred$meanTemperaturez*sd(adult$meanTemperature,na.rm = TRUE)) +
+  mean(adult$meanTemperature,na.rm = TRUE)
+df.pred$observedWeight <- (df.pred$observedWeightz*sd(adult$observedWeight,na.rm = TRUE)) +
+  mean(adult$observedWeight,na.rm = TRUE)
+
+df.predaverage <- df.pred %>% group_by(meanTemperature, observedWeight, section) %>% 
+  mutate(meanpred = mean(predictions))
+
+# 3. Plot the predictions
+library(ggplot2)
+
+ggplot(df.predaverage, aes(x = meanTemperature, y = meanpred, color = section, 
+                           fill = section)) +
+  geom_line() +
+  xlab("Mean Temperature (C)") +
+  ylab("Predicted Probability of Being a Mover") +
+  theme_minimal()
+
+```
+
+```{r}
+# Extract unique levels of 'tag' from the original data
+tag_levels <- levels(adult$tagID_factor)
+
+# Create df.predict with 'tag' included using the existing levels
+df.predict <- expand.grid(
+  observedWeightz = seq(min(adult$observedWeightz), max(adult$observedWeightz), length=100),
+  meanTemperaturez = mean(adult$meanTemperaturez),
+  section = unique(adult$section),
+  tagID_factor = tag_levels  # Include 'tag' using existing levels
+)
+
+# 1. Generate predictions on the response scale
+predictions <- predict(b.best, newdata = df.predict, type = "response")
+
+# 2. Create a dataframe with predictions and relevant predictor variables
+df.pred <- cbind(df.predict, predictions)
+
+# Calculate confidence intervals 
+# df.pred$ci.lo <- df.pred$fit - 1.96 * df.pred$se.fit
+# df.pred$ci.hi <- df.pred$fit + 1.96 * df.pred$se.fit
+
+# unscale our explanatory variables
+df.pred$meanTemperature <- (df.pred$meanTemperaturez*sd(adult$meanTemperature,na.rm = TRUE)) +
+  mean(adult$meanTemperature,na.rm = TRUE)
+df.pred$observedWeight <- (df.pred$observedWeightz*sd(adult$observedWeight,na.rm = TRUE)) +
+  mean(adult$observedWeight,na.rm = TRUE)
+
+df.predaverage <- df.pred %>% group_by(meanTemperature, observedWeight, section) %>% 
+  mutate(meanpred = mean(predictions))
+
+# 3. Plot the predictions
+library(ggplot2)
+
+ggplot(df.predaverage, aes(x = observedWeight, y = meanpred, color = section, fill = section)) +
+  geom_line() +
+  xlab("Observed Weight (g)") +
+  ylab("Predicted Probability of Being a Mover") +
+  theme_minimal()
+
+```
+

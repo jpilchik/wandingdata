@@ -6,7 +6,7 @@ Code to shrink the dataset with all of the wanding and environmental data into a
 
 Load the dataset with all of the wanding and environmental data into R.
 ```{r load in data table}
-cdWB <- read.csv('/Users/jpilchik/OneDrive - DOI/Documents/Wanding_Data/docs/data/cdWB_All.csv', header=T)
+cdWB <- read.csv('/Users/jpilchik/OneDrive - DOI/Documents/Wanding_Data/data/cdWB_All.csv', header=T)
 ```
 
 Filter the dataset to include only the Obear brook observations.
@@ -21,14 +21,58 @@ obear_All <- cdWB %>% filter(river %in% river_name)
 head(obear_All)
 ```
 
-Filter the dataset to include only the relevant explanatory variables.
-```{r}
-obear <- obear_All %>% select(-one_of('survey', 'pass', 'comments', 'proportionSampled', 'lagDetectionDate', 'meanFlow', 'meanFlowByArea_flowExt', 'meanFlowByArea_ByRiver', 'sdFlow', 'sdFlowByRiver', 'sdFlowByArea_flowExt', 'sdFlowByArea_ByRiver', 'propBelowLoFlowThreshByRiver', 'propAboveHiFlowThreshByRiver', 'propBelowLoFlowThreshByArea_flowExt', 'propAboveHiFlowThreshByArea_flowExt', 'sectionN', 'instance', 'quarter', 'habitat', 'cover', 'justification', 'sectionWQuarter', 'j', 'dummy', 'ageInSamples', 'lagSection', 'lagObservedWeight', 'lagObservedLength', 'lagSampleNumber', 'sampleNumberDiff', 'minSample', 'maxSample', 'minYear', 'sampleInterval', 'quarter_length', 'river_meter', 'confluence_river_meter', 'riverMeter', 'nPasses', 'wGR_Slope', 'grWeightS', 'lw_intercept', 'lw_slope', 'cf', 'relCF', 'nPerInd', 'meanTemperatureScaledBySeason', 'meanFlowScaledBySeason', 'meanFlowByRiverScaledBySeason', 'meanFlowByArea_flowExtScaledBySeason', 'meanFlowByArea_ByRiverScaledBySeason', 'meanTemperatureScaledBySeasonRiver', 'meanFlowScaledBySeasonRiver', 'meanFlowByRiverScaledBySeasonRiver', 'meanFlowByArea_flowExtScaledBySeasonRiver', 'meanFlowByArea_ByRiverScaledBySeasonRiver', 'comment', 'sampleType', 'departure', 'readerType', 'riverOrdered', 'sampleName', 'sampleNumber', 'dateEmigrated', 'grWeight', 'grLength', 'drainage', 'inside', 'area', 'leftOrRight', 'readerId', 'species', 'aliveOrDead', 'sectionOriginal', 'cohort', 'sex', 'season', 'yday', 'date')) 
-```
-
 Break the date observations into month and year so that those variables can be used separately as explanatory variables.
 ```{r}
 library(tidyverse)
-obear <- separate(obear, detectionDate, into = c('year', 'month', 'day', 'time')) %>% select(-one_of('day','time'))
+obear <- separate(obear_All, detectionDate, into = c('year', 'month', 'day', 'time')) %>% dplyr::select(-one_of('day','time'))
 head(obear)
 ```
+
+Filter the dataset to include only the relevant explanatory variables.
+```{r}
+obear <- obear %>% dplyr::select(tag, year, month, river, section, observedLength, observedWeight, meanTemperature, meanFlowByRiver, isYOY, distMoved, moveDir)
+head(obear)
+```
+```{r}
+# Remove NA values
+sub <- obear[!is.na(obear$distMoved),]
+sub <- sub[!is.na(sub$observedLength),]
+sub <- sub[!is.na(sub$observedWeight),]
+head(sub)
+```
+
+```{r}
+# Separate adults from YOY
+sub$isYOY <- as.factor(sub$isYOY)
+adult_all <- sub[ which(sub$isYOY=='FALSE'), ]
+```
+
+```{r}
+# Remove the -90 value
+adult <- adult_all[-which(adult_all$distMoved==-90), ]
+
+# Create a new distMovedp column that removes negative values
+adult$distMovedp <- abs(adult$distMoved)
+
+#rescale explanatory variables
+adult$observedWeightz <- c(scale(adult$observedWeight))
+adult$meanTemperaturez <- c(scale(adult$meanTemperature))
+adult$meanFlowByRiverz <- c(scale(adult$meanFlowByRiver))
+adult$observedLengthz <- c(scale(adult$observedLength))
+
+# Turn categorical variables into factors
+adult$year <- as.factor(adult$year)
+adult$month <- as.factor(adult$month)
+adult$section <- as.factor(adult$section)
+
+adult$tag <- trimws(adult$tag)
+# Convert 'tag' to a factor to assign unique levels
+adult$tag_factor <- factor(adult$tag)
+# Convert the factor levels to sequential ID numbers
+adult$tagID <- as.numeric(adult$tag_factor)
+adult$tagID_factor <- factor(adult$tagID)
+
+head(adult)
+summary(adult)
+```
+
