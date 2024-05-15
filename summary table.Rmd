@@ -1,0 +1,22 @@
+---
+title: "summary table"
+author: "Josie Pilchik"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r summary table, echo=FALSE}
+library(GGally)
+library(ggplot2)
+library(pROC)
+library(AICcmodavg)
+library(car)
+library(DHARMa)
+library(MuMIn)
+library(lme4)
+library(tidyverse)
+head(adult)
+#Define the best model based on the above information (that being b.glmm/mm1)
+b.best <- glmer(non_zero ~ section + observedWeightz + meanTemperaturez + (1|tagID_factor), data=adult, family = binomial(link = logit), control = glmerControl(optimizer = "bobyqa", 
+                                       optCtrl = list(maxfun = 100000)))
+summary(b.best)
+```

@@ -1,24 +1,24 @@
 # EcoStats Final Project
-Name: Josie Pilchik
+Name: Josie Pilchik <br>
 Date: 5/15/2024
 
-Response variable: 
--distMoved
+Response variable: <br>
+-distMoved <br>
 
-Potential explanatory variables (to be explored through data exploration):
--year
--month
--section (the section the fish is found in at each of the sampling events)
--observedLength
--observedWeight
--meanTemperature
+Potential explanatory variables (to be explored through data exploration): <br>
+-year <br>
+-month <br>
+-section (the section the fish is found in at each of the sampling events) <br>
+-observedLength <br>
+-observedWeight <br>
+-meanTemperature <br>
 -meanFlowByRiver
 
-Random effects variables:
+Random effects variables: <br>
 -tag
 
 ## Data loading
-```{r load packages}
+```{r}
 # load packages needed later
 library(GGally)
 library(ggplot2)
@@ -29,9 +29,77 @@ library(DHARMa)
 library(MuMIn)
 library(lme4)
 library(tidyverse)
+library(dplyr)
+```
 
-head(adult_all)
+Load the dataset with all of the wanding and environmental data into R.
+```{r load in data table}
+cdWB <- read.csv('/Users/jpilchik/OneDrive - DOI/Documents/Wanding_Data/data/cdWB_All.csv', header=T)
+```
+
+Filter the dataset to include only the Obear brook observations.
+```{r filter to just Obear}
+#specify team names to keep
+river_name <- 'wb obear'
+
+#select all rows where team is in list of team names to keep
+obear_All <- cdWB %>% filter(river %in% river_name)
+head(obear_All)
+```
+
+Break the date observations into month and year so that those variables can be used separately as explanatory variables.
+```{r}
+obear <- separate(obear_All, detectionDate, into = c('year', 'month', 'day', 'time')) %>% dplyr::select(-one_of('day','time'))
+head(obear)
+```
+
+Filter the dataset to include only the relevant explanatory variables.
+```{r}
+obear <- obear %>% dplyr::select(tag, year, month, river, section, observedLength, observedWeight, meanTemperature, meanFlowByRiver, isYOY, distMoved, moveDir)
+head(obear)
+```
+
+```{r}
+# Remove NA values
+sub <- obear[!is.na(obear$distMoved),]
+sub <- sub[!is.na(sub$observedLength),]
+sub <- sub[!is.na(sub$observedWeight),]
+head(sub)
+```
+
+```{r}
+# Separate adults from YOY
+sub$isYOY <- as.factor(sub$isYOY)
+adult_all <- sub[ which(sub$isYOY=='FALSE'), ]
+```
+
+```{r}
+# Remove the -90 value
+adult <- adult_all[-which(adult_all$distMoved==-90), ]
+
+# Create a new distMovedp column that removes negative values
+adult$distMovedp <- abs(adult$distMoved)
+
+#rescale explanatory variables
+adult$observedWeightz <- c(scale(adult$observedWeight))
+adult$meanTemperaturez <- c(scale(adult$meanTemperature))
+adult$meanFlowByRiverz <- c(scale(adult$meanFlowByRiver))
+adult$observedLengthz <- c(scale(adult$observedLength))
+
+# Turn categorical variables into factors
+adult$year <- as.factor(adult$year)
+adult$month <- as.factor(adult$month)
+adult$section <- as.factor(adult$section)
+
+adult$tag <- trimws(adult$tag)
+# Convert 'tag' to a factor to assign unique levels
+adult$tag_factor <- factor(adult$tag)
+# Convert the factor levels to sequential ID numbers
+adult$tagID <- as.numeric(adult$tag_factor)
+adult$tagID_factor <- factor(adult$tagID)
+
 head(adult)
+summary(adult)
 ```
 
 ## Data exploration
@@ -304,6 +372,4 @@ ggplot(df.predaverage, aes(x = observedWeight, y = meanpred, color = section, fi
   theme_minimal()
 
 ```
-
-
 

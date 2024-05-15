@@ -17,8 +17,7 @@ book:
   date: today
   chapters:
     - index.qmd
-    - creating a dataset.qmd
-    - EcoStats Final Project.qmd
+    - EcoStats Final Project Code.qmd
 
 format:
   html:
